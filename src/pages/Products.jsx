@@ -4,7 +4,8 @@ import { Link } from "react-router-dom";
 const Products = ({ products = [], addToCart = () => {} }) => {
   const [selected, setSelected] = useState(null);
   const [mainImage, setMainImage] = useState("");
-  const [zoomed, setZoomed] = useState(false); // 🔹 new state for zoom toggle
+  const [zoomed, setZoomed] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleImageError = (e) => {
     e.target.onerror = null;
@@ -12,7 +13,6 @@ const Products = ({ products = [], addToCart = () => {} }) => {
       "https://via.placeholder.com/400x400?text=Image+Not+Available";
   };
 
-  // ✅ Utility to always prepend /images if missing
   const resolveImagePath = (img) => {
     if (!img) return "";
     return img.startsWith("/images/") ? img : `/images/${img}`;
@@ -75,24 +75,19 @@ const Products = ({ products = [], addToCart = () => {} }) => {
             fontSize: "1.05rem",
           }}
         >
-          <Link to="/" style={{ textDecoration: "none", color: "#000" }}>
-            Home
-          </Link>
-          <Link to="/products" style={{ textDecoration: "none", color: "#000" }}>
-            Catalogue
-          </Link>
-          <Link to="/checkout" style={{ textDecoration: "none", color: "#000" }}>
-            Checkout
-          </Link>
-          <Link to="/policies" style={{ textDecoration: "none", color: "#000" }}>
-            Policies
-          </Link>
-          <Link to="/contact" style={{ textDecoration: "none", color: "#000" }}>
-            Contact
-          </Link>
+          <Link to="/" style={{ textDecoration: "none", color: "#000" }}>Home</Link>
+          <Link to="/products" style={{ textDecoration: "none", color: "#000" }}>Catalogue</Link>
+          <Link to="/checkout" style={{ textDecoration: "none", color: "#000" }}>Checkout</Link>
+          <Link to="/policies" style={{ textDecoration: "none", color: "#000" }}>Policies</Link>
+          <Link to="/contact" style={{ textDecoration: "none", color: "#000" }}>Contact</Link>
         </div>
       </nav>
     </>
+  );
+
+  // Filter products based on search
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (selected) {
@@ -215,9 +210,27 @@ const Products = ({ products = [], addToCart = () => {} }) => {
   return (
     <div style={{ padding: "1.5rem" }}>
       <TopNav />
+
+      {/* Search Bar at Top */}
+      <div style={{ display: "flex", justifyContent: "center", margin: "1rem 0" }}>
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            padding: "0.5rem 1rem",
+            width: "250px",
+            fontSize: "1rem",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+          }}
+        />
+      </div>
+
       <h2 style={{ textAlign: "center", marginBottom: "1rem" }}>🛍️ Products</h2>
-      {products.length === 0 ? (
-        <p>No products added yet.</p>
+      {filteredProducts.length === 0 ? (
+        <p>No products found matching "{searchTerm}"</p>
       ) : (
         <div
           style={{
@@ -226,7 +239,7 @@ const Products = ({ products = [], addToCart = () => {} }) => {
             gap: "1.5rem",
           }}
         >
-          {products.map((p, idx) => {
+          {filteredProducts.map((p, idx) => {
             const imgSrc =
               p.images?.find((img) => img && img.trim() !== "") || "";
             const finalImage = resolveImagePath(imgSrc);
@@ -253,12 +266,8 @@ const Products = ({ products = [], addToCart = () => {} }) => {
                   setMainImage(finalImage);
                   setZoomed(false);
                 }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.transform = "scale(1.03)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.transform = "scale(1)")
-                }
+                onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
+                onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
               >
                 {finalImage ? (
                   <img
@@ -291,8 +300,7 @@ const Products = ({ products = [], addToCart = () => {} }) => {
                   </div>
                 )}
                 <h4 style={{ margin: "0.5rem 0" }}>
-                  {p.name}{" "}
-                  {p.soldOut && <span style={{ color: "red" }}>(Sold Out)</span>}
+                  {p.name} {p.soldOut && <span style={{ color: "red" }}>(Sold Out)</span>}
                 </h4>
                 <p style={{ fontWeight: "bold" }}>Rs {p.price}</p>
                 <button

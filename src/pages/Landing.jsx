@@ -1,9 +1,16 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
 
 const Landing = ({ products = [] }) => {
-  // Show only first 4 products as featured
-  const featured = products.slice(0, 4);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Filter products based on search input
+  const filteredProducts = products.filter((p) =>
+    p.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Show first 4 featured products if no search
+  const featured = searchTerm ? filteredProducts : products.slice(0, 4);
 
   return (
     <div style={{ backgroundColor: "#fffdf4", minHeight: "100vh" }}>
@@ -37,7 +44,6 @@ const Landing = ({ products = [] }) => {
         </div>
       </div>
 
-      {/* Inline keyframes for marquee animation */}
       <style>
         {`
           @keyframes marquee {
@@ -67,23 +73,30 @@ const Landing = ({ products = [] }) => {
             fontSize: "1.05rem",
           }}
         >
-          <Link to="/" style={{ textDecoration: "none", color: "#000" }}>
-            Home
-          </Link>
-          <Link to="/products" style={{ textDecoration: "none", color: "#000" }}>
-            Catalogue
-          </Link>
-          <Link to="/checkout" style={{ textDecoration: "none", color: "#000" }}>
-            Checkout
-          </Link>
-          <Link to="/policies" style={{ textDecoration: "none", color: "#000" }}>
-            Policies
-          </Link>
-          <Link to="/contact" style={{ textDecoration: "none", color: "#000" }}>
-            Contact
-          </Link>
+          <Link to="/" style={{ textDecoration: "none", color: "#000" }}>Home</Link>
+          <Link to="/products" style={{ textDecoration: "none", color: "#000" }}>Catalogue</Link>
+          <Link to="/checkout" style={{ textDecoration: "none", color: "#000" }}>Checkout</Link>
+          <Link to="/policies" style={{ textDecoration: "none", color: "#000" }}>Policies</Link>
+          <Link to="/contact" style={{ textDecoration: "none", color: "#000" }}>Contact</Link>
         </div>
       </nav>
+
+      {/* Search Bar (Top, below navbar) */}
+      <div style={{ display: "flex", justifyContent: "center", marginTop: "1.5rem" }}>
+        <input
+          type="text"
+          placeholder="Search products..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          style={{
+            padding: "0.5rem 1rem",
+            width: "250px",
+            fontSize: "1rem",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+          }}
+        />
+      </div>
 
       {/* Main Content */}
       <div
@@ -93,116 +106,91 @@ const Landing = ({ products = [] }) => {
           alignItems: "center",
           justifyContent: "center",
           textAlign: "center",
-          padding: "3rem 2rem", // reduced padding so featured comes higher
+          padding: "3rem 2rem",
           position: "relative",
         }}
       >
-        <h1
-          style={{
-            fontSize: "3.5rem",
-            marginBottom: "1rem",
-            color: "#000",
-            position: "relative",
-          }}
+        {/* Plane Icon Above Mequ */}
+        <svg
+          width="180"
+          height="60"
+          viewBox="0 0 180 60"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          style={{ marginBottom: "-40px" }}
         >
+          <path d="M0,50 Q90,-20 180,50" stroke="#333" strokeWidth="2" fill="none" />
+          <polygon points="175,48 180,50 175,52" fill="#333" />
+        </svg>
+
+        <h1 style={{ fontSize: "3.5rem", marginBottom: "1rem", color: "#000", position: "relative" }}>
           <span style={{ position: "relative", zIndex: 2 }}>Mequ</span>
-          {/* Plane Icon Path above */}
-          <svg
-            width="180"
-            height="60"
-            viewBox="0 0 180 60"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            style={{
-              position: "absolute",
-              top: "-30px",
-              left: "calc(50% - 90px)",
-              zIndex: 1,
-            }}
-          >
-            <path
-              d="M0,50 Q90,-20 180,50"
-              stroke="#333"
-              strokeWidth="2"
-              fill="none"
-            />
-            <polygon points="175,48 180,50 175,52" fill="#333" />
-          </svg>
         </h1>
 
-        <p style={{ fontSize: "1.2rem", color: "#444" }}>
-          “Where your money learns to stretch.”
-        </p>
-        <p
-          style={{
-            marginTop: "1.5rem",
-            fontSize: "1.1rem",
-            color: "#666",
-            maxWidth: "600px",
-          }}
-        >
-          Unbeatable prices · Flash deals · Smoother & faster delivery · No extra
-          tax · Imported products
+        <p style={{ fontSize: "1.2rem", color: "#444" }}>“Where your money learns to stretch.”</p>
+        <p style={{ marginTop: "1.5rem", fontSize: "1.1rem", color: "#666", maxWidth: "600px" }}>
+          Unbeatable prices · Flash deals · Smoother & faster delivery · No extra tax · Imported products
         </p>
 
-        {/* Featured Products */}
-        {featured.length > 0 && (
-          <div style={{ marginTop: "2rem", width: "100%", maxWidth: "900px" }}>
-            <h2>🌟 Featured Products</h2>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-                gap: "1.5rem",
-                marginTop: "1rem",
-              }}
-            >
-              {featured.map((p, i) => (
-                <Link
-                  key={i}
-                  to="/products"
-                  style={{
-                    textDecoration: "none",
-                    color: "#000",
-                    textAlign: "center",
-                    border: "1px solid #ccc",
-                    borderRadius: "8px",
-                    padding: "0.5rem",
-                  }}
-                >
-                  {p.images?.[0] && (
-                    <img
-                      src={`/images/${p.images[0].replace("/images/", "")}`}
-                      alt={p.name}
-                      style={{
-                        width: "100%",
-                        height: "150px",
-                        objectFit: "cover",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  )}
-                  <h4 style={{ margin: "0.5rem 0 0 0" }}>{p.name}</h4>
-                  <p style={{ fontWeight: "bold" }}>Rs {p.price}</p>
-                </Link>
-              ))}
-            </div>
-            <div style={{ marginTop: "1rem" }}>
-              <Link
-                to="/products"
+        {/* Featured / Search Results */}
+        <div style={{ marginTop: "2rem", width: "100%", maxWidth: "900px" }}>
+          {filteredProducts.length === 0 ? (
+            <p style={{ marginTop: "1rem" }}>No products found matching "{searchTerm}"</p>
+          ) : (
+            <>
+              <h2>{searchTerm ? "🔍 Search Results" : "🌟 Featured Products"}</h2>
+              <div
                 style={{
-                  textDecoration: "none",
-                  color: "#fff",
-                  backgroundColor: "#333",
-                  padding: "0.5rem 1rem",
-                  borderRadius: "6px",
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                  gap: "1.5rem",
+                  marginTop: "1rem",
                 }}
               >
-                View Full Catalogue
-              </Link>
-            </div>
-          </div>
-        )}
+                {featured.map((p, i) => (
+                  <Link
+                    key={i}
+                    to="/products"
+                    style={{
+                      textDecoration: "none",
+                      color: "#000",
+                      textAlign: "center",
+                      border: "1px solid #ccc",
+                      borderRadius: "8px",
+                      padding: "0.5rem",
+                    }}
+                  >
+                    {p.images?.[0] && (
+                      <img
+                        src={`/images/${p.images[0].replace("/images/", "")}`}
+                        alt={p.name}
+                        style={{ width: "100%", height: "150px", objectFit: "cover", borderRadius: "8px" }}
+                      />
+                    )}
+                    <h4 style={{ margin: "0.5rem 0 0 0" }}>{p.name}</h4>
+                    <p style={{ fontWeight: "bold" }}>Rs {p.price}</p>
+                  </Link>
+                ))}
+              </div>
+              {!searchTerm && (
+                <div style={{ marginTop: "1rem" }}>
+                  <Link
+                    to="/products"
+                    style={{
+                      textDecoration: "none",
+                      color: "#fff",
+                      backgroundColor: "#333",
+                      padding: "0.5rem 1rem",
+                      borderRadius: "6px",
+                    }}
+                  >
+                    View Full Catalogue
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
