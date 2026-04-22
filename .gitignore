@@ -34,3 +34,5 @@ dist-ssr
 # Local environment variables
 .env
 .env.local
+
+.vercel

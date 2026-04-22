@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+
 import Landing from "./pages/Landing";
 import Policies from "./pages/Policies";
 import Checkout from "./pages/Checkout";
 import Products from "./pages/Products";
-import Admin from "./pages/Admin";
 import Payment from "./pages/Payment";
 import Contact from "./pages/Contact";
 import WhatsAppButton from "./components/WhatsAppButton";
+
+import AdminDashboard from "./pages/AdminDashboard";
+import AddProduct from "./pages/AddProduct";
+import ProductsPage from "./pages/ProductsPage";
+import OrdersPage from "./pages/OrdersPage";
+import InvoiceGenerator from "./pages/InvoiceGenerator";
+
+import DMOrderForm from "./pages/DMOrderForm";
+import DMOrders from "./pages/DMOrders";
+
+import Logistics from "./pages/Logistics";
+import TrackOrder from "./pages/TrackOrder";
+import ScannerPage from "./pages/ScannerPage";
+
 import imageCompression from "browser-image-compression";
 
 function App() {
@@ -28,34 +42,10 @@ function App() {
 
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // Persist cart
-  useEffect(() => {
-    try {
-      localStorage.setItem("cart", JSON.stringify(cart));
-    } catch (e) {
-      console.error("Error saving cart to localStorage:", e);
-    }
-  }, [cart]);
+  useEffect(() => { localStorage.setItem("cart", JSON.stringify(cart)); }, [cart]);
+  useEffect(() => { localStorage.setItem("products", JSON.stringify(products)); }, [products]);
+  useEffect(() => { localStorage.setItem("orders", JSON.stringify(orders)); }, [orders]);
 
-  // Persist products
-  useEffect(() => {
-    try {
-      localStorage.setItem("products", JSON.stringify(products));
-    } catch (e) {
-      console.error("Error saving products to localStorage:", e);
-    }
-  }, [products]);
-
-  // Persist orders
-  useEffect(() => {
-    try {
-      localStorage.setItem("orders", JSON.stringify(orders));
-    } catch (e) {
-      console.error("Error saving orders to localStorage:", e);
-    }
-  }, [orders]);
-
-  // Compress image
   const compressAndConvert = async (file) => {
     const options = { maxSizeMB: 0.1, maxWidthOrHeight: 800, useWebWorker: true };
     try {
@@ -77,26 +67,19 @@ function App() {
         if (compressed) compressedImages.push(compressed);
       }
     }
-
-    setProducts((prev) => [
-      ...prev,
-      { ...newProduct, soldOut: false, images: compressedImages }
-    ]);
+    setProducts((prev) => [...prev, { ...newProduct, soldOut: false, images: compressedImages }]);
   };
 
   const deleteProduct = (index) => setProducts((prev) => prev.filter((_, i) => i !== index));
+
   const toggleSoldOut = (index) =>
-    setProducts((prev) =>
-      prev.map((p, i) => (i === index ? { ...p, soldOut: !p.soldOut } : p))
-    );
+    setProducts((prev) => prev.map((p, i) => i === index ? { ...p, soldOut: !p.soldOut } : p));
 
   const addToCart = (product) => {
     setCart((prev) => {
       const existing = prev.find((p) => p.id === product.id);
       if (existing) {
-        return prev.map((p) =>
-          p.id === product.id ? { ...p, quantity: (p.quantity || 1) + 1 } : p
-        );
+        return prev.map((p) => p.id === product.id ? { ...p, quantity: (p.quantity || 1) + 1 } : p);
       }
       return [...prev, { ...product, quantity: 1 }];
     });
@@ -104,44 +87,29 @@ function App() {
 
   const updateCart = (newCart) => setCart(newCart);
 
-  const submitOrder = (name, email) => {
-    if (!cart.length) return alert("Cart is empty");
-    const newOrder = {
-      id: Date.now(),
-      items: cart,
-      total: cart.reduce((sum, i) => sum + Number(i.price) * (i.quantity || 1), 0),
-      customerName: name,
-      customerEmail: email,
-      status: "pending",
-      date: new Date().toLocaleString(),
-    };
-    setOrders((prev) => [...prev, newOrder]);
-    setCart([]);
-    alert("Order submitted! Wait for confirmation.");
-  };
-
   const addOrder = (order) => {
     setOrders((prev) => [...prev, order]);
     setCart([]);
   };
 
   const markPaid = (orderId) =>
-    setOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, status: "paid" } : o))
-    );
+    setOrders((prev) => prev.map((o) => o.id === orderId ? { ...o, status: "paid" } : o));
 
   return (
     <Router>
       <Routes>
         <Route
           path="/"
-          element={<Landing products={products} addToCart={addToCart} setSelectedProduct={setSelectedProduct} />}
+          element={
+            <Landing
+              cartItems={cart}
+              onAddToCart={addToCart}
+              setSelectedProduct={setSelectedProduct}
+            />
+          }
         />
         <Route path="/policies" element={<Policies />} />
-        <Route
-          path="/checkout"
-          element={<Checkout cart={cart} updateCart={updateCart} />}
-        />
+        <Route path="/checkout" element={<Checkout cart={cart} updateCart={updateCart} />} />
         <Route
           path="/products"
           element={
@@ -154,20 +122,22 @@ function App() {
           }
         />
         <Route path="/contact" element={<Contact />} />
-        <Route
-          path="/admin"
-          element={
-            <Admin
-              products={products}
-              addProduct={addProduct}
-              deleteProduct={deleteProduct}
-              toggleSoldOut={toggleSoldOut}
-              orders={orders}
-              markPaid={markPaid}
-            />
-          }
-        />
         <Route path="/payment" element={<Payment cart={cart} addOrder={addOrder} />} />
+
+        {/* Public */}
+        <Route path="/dm-order" element={<DMOrderForm />} />
+        <Route path="/track" element={<TrackOrder />} />
+
+        {/* Admin */}
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/admin/add-product" element={<AddProduct addProduct={addProduct} />} />
+        <Route path="/admin/products" element={<ProductsPage products={products} deleteProduct={deleteProduct} toggleSoldOut={toggleSoldOut} />} />
+        <Route path="/admin/orders" element={<OrdersPage orders={orders} markPaid={markPaid} />} />
+        <Route path="/orders" element={<OrdersPage orders={orders} markPaid={markPaid} />} />
+        <Route path="/admin/invoices" element={<InvoiceGenerator />} />
+        <Route path="/admin/dm-orders" element={<DMOrders />} />
+        <Route path="/admin/logistics" element={<Logistics />} />
+        <Route path="/admin/scanner" element={<ScannerPage />} />
       </Routes>
 
       <WhatsAppButton />

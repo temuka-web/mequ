@@ -1,0 +1,421 @@
+/* ==================== SCREEN VIEW ==================== */
+.invoice-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  align-items: center;
+  background: #f0f0f0;
+}
+
+.invoice-block {
+  width: 100%;
+  max-width: 800px;
+  background: white;
+  padding: 14px;
+  border: 2px solid #000;
+  font-family: Arial, sans-serif;
+  color: #000;
+  box-sizing: border-box;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.prepaid-header {
+  font-weight: 900;
+  font-size: 22px;
+  margin: 0 0 10px 0;
+  text-align: left;
+}
+
+.invoice-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 15px;
+  padding-bottom: 10px;
+  margin-bottom: 10px;
+  border-bottom: 2px solid #000;
+}
+
+.receiver-info, .sender-info {
+  width: 48%;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.receiver-info {
+  padding: 10px;
+  border: 2px solid black;
+  border-radius: 4px;
+  background: #f5f5f5;
+}
+
+.sender-info {
+  font-weight: 900;
+  font-size: 17px;
+  color: #000;
+  line-height: 1.6;
+}
+
+.section-title {
+  font-weight: 900;
+  font-size: 18px;
+  margin: 0 0 8px 0;
+}
+
+.field-group {
+  margin-bottom: 6px;
+}
+
+.field-group label {
+  display: block;
+  font-weight: 900;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.receiver-info input,
+.receiver-info textarea {
+  width: 100%;
+  padding: 4px;
+  font-size: 17px;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  font-family: Arial, sans-serif;
+  box-sizing: border-box;
+  font-weight: 900;
+  color: #000;
+  line-height: 1.6;
+}
+
+.receiver-info textarea {
+  resize: vertical;
+  min-height: 50px;
+  line-height: 1.6;
+}
+
+.order-info {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: bold;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #000;
+}
+
+.order-info h2 {
+  font-size: 17px;
+  margin: 0 0 5px 0;
+}
+
+.order-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.barcode svg {
+  height: 45px !important;
+}
+
+.amount-group {
+  margin: 10px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.amount-group label {
+  font-weight: 900;
+  font-size: 22px;
+  color: #000;
+}
+
+.amount-group input {
+  padding: 6px 10px;
+  font-size: 32px;
+  font-weight: 900;
+  color: #000;
+  border: 3px solid #000;
+  border-radius: 4px;
+  width: 200px;
+}
+
+.urdu-warning {
+  font-weight: 900;
+  font-size: 20px;
+  color: #000;
+  margin-top: 10px;
+  text-align: center;
+  padding: 10px;
+  background: #fff3cd;
+  border: 1px solid #e0c060;
+  border-radius: 4px;
+  line-height: 1.6;
+}
+
+.delete-btn {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.delete-btn:hover {
+  background: #c82333;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.actions button {
+  padding: 10px 16px;
+  font-weight: bold;
+  font-size: 13px;
+  cursor: pointer;
+  background: black;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.actions button:hover {
+  background: #333;
+}
+
+
+/* ==================== PRINT MODE - 3 INVOICES PER A4 PAGE ==================== */
+@media print {
+
+  @page {
+    size: A4;
+    margin: 4mm;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .invoice-page {
+    display: block !important;
+    width: 100%;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: white !important;
+  }
+
+  /* KEY FIX: no fixed height, use min-height so content never overflows into itself */
+  .invoice-block {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: 31vh !important;
+    max-height: 32.5vh !important;
+    margin: 0 0 2px 0 !important;
+    padding: 4px 6px !important;
+    border: 1.5px solid #000 !important;
+    box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+  }
+
+  .invoice-block:nth-child(3n) {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .prepaid-header {
+    font-weight: 900 !important;
+    font-size: 13px !important;
+    color: #000 !important;
+    margin: 0 0 2px 0 !important;
+    flex-shrink: 0 !important;
+    line-height: 1.2 !important;
+  }
+
+  .invoice-header {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 5px !important;
+    padding-bottom: 2px !important;
+    margin-bottom: 2px !important;
+    border-bottom: 1.5px solid #000 !important;
+    flex-shrink: 0 !important;
+    overflow: visible !important;
+    align-items: flex-start !important;
+  }
+
+  /* KEY FIX: overflow visible, no clipping */
+  .receiver-info, .sender-info {
+    width: 48% !important;
+    line-height: 1.35 !important;
+    overflow: visible !important;
+  }
+
+  .receiver-info {
+    padding: 3px 4px !important;
+    border: 1.5px solid #000 !important;
+    background: #f9f9f9 !important;
+    border-radius: 0 !important;
+  }
+
+  .section-title {
+    font-weight: 900 !important;
+    font-size: 11px !important;
+    color: #000 !important;
+    margin: 0 0 2px 0 !important;
+  }
+
+  /* KEY FIX: no margin so fields don't push each other */
+  .field-group {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
+  .field-group label {
+    font-weight: 900 !important;
+    font-size: 7.5px !important;
+    color: #444 !important;
+    margin: 0 !important;
+    display: block !important;
+    text-transform: uppercase !important;
+    line-height: 1.2 !important;
+  }
+
+  /* KEY FIX: inputs have no padding/margin, tight line-height */
+  .receiver-info input,
+  .receiver-info textarea {
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.35 !important;
+    font-weight: 900 !important;
+    color: #000 !important;
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    resize: none !important;
+    overflow: visible !important;
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    font-family: Arial, sans-serif !important;
+  }
+
+  .receiver-info textarea {
+    min-height: auto !important;
+    max-height: none !important;
+  }
+
+  .sender-info {
+    font-weight: 900 !important;
+    color: #000 !important;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+    overflow: visible !important;
+  }
+
+  .sender-info p {
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+    line-height: 1.45 !important;
+    font-weight: 900 !important;
+    color: #000 !important;
+  }
+
+  .order-info {
+    margin-top: 2px !important;
+    padding-bottom: 2px !important;
+    border-bottom: 1.5px solid #000 !important;
+    font-size: 11px !important;
+    flex-shrink: 0 !important;
+    color: #000 !important;
+  }
+
+  .order-info h2 {
+    font-size: 11px !important;
+    font-weight: 900 !important;
+    color: #000 !important;
+    margin: 0 0 1px 0 !important;
+  }
+
+  .order-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    margin-bottom: 1px !important;
+  }
+
+  .barcode svg {
+    height: 22px !important;
+    width: auto !important;
+  }
+
+  .amount-group {
+    margin: 1px 0 0 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+  }
+
+  .amount-group label {
+    font-weight: 900 !important;
+    font-size: 13px !important;
+    color: #000 !important;
+    margin-right: 0 !important;
+  }
+
+  .amount-group input {
+    font-size: 22px !important;
+    font-weight: 900 !important;
+    color: #000 !important;
+    border: none !important;
+    background: transparent !important;
+    width: auto !important;
+    padding: 0 !important;
+  }
+
+  /* ALWAYS VISIBLE — pinned to bottom, never overwritten */
+  .urdu-warning {
+    font-weight: 900 !important;
+    font-size: 13px !important;
+    color: #000 !important;
+    text-align: center !important;
+    margin-top: auto !important;
+    padding: 3px !important;
+    background: #fff3cd !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    border: 1px solid #e0c060 !important;
+    border-radius: 0 !important;
+    flex-shrink: 0 !important;
+    line-height: 1.4 !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .actions,
+  .delete-btn,
+  .print-btn {
+    display: none !important;
+  }
+
+}

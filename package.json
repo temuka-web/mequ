@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@emailjs/browser": "^4.4.1",
+    "@supabase/supabase-js": "^2.57.4",
     "axios": "^1.11.0",
     "browser-image-compression": "^2.0.2",
     "emailjs-com": "^3.2.0",
@@ -22,8 +23,10 @@
     "react": "^19.1.0",
     "react-barcode": "^1.6.1",
     "react-dom": "^19.1.0",
+    "react-feather": "^2.0.10",
     "react-qr-code": "^2.0.18",
-    "react-router-dom": "^7.7.1"
+    "react-router-dom": "^7.7.1",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
