@@ -1,10 +1,17 @@
+// src/pages/Payment.jsx
 import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
 import { supabase } from "../supabase";
 import "./Payment.css";
 
 const generateOrderId = () => "ORD-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 
-const Payment = ({ cart }) => {
+const Payment = () => {
+  const location = useLocation();
+
+  const passedItems = location.state?.items || [];
+  const passedTotal = location.state?.total || 0;
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -21,10 +28,11 @@ const Payment = ({ cart }) => {
   const [errorMsg, setErrorMsg] = useState("");
   const [orderId, setOrderId] = useState("");
 
-  const subtotal = cart.reduce(
-    (sum, item) => sum + Number(item.price) * (item.quantity || 1),
+  const subtotal = passedItems.reduce(
+    (sum, item) => sum + Number(item.price || 0) * (item.quantity || 1),
     0
   );
+
   const smallOrderThreshold = 700;
   const deliveryCharges = subtotal <= smallOrderThreshold ? 150 : 250;
   const isSmallOrder = subtotal <= smallOrderThreshold;
@@ -45,91 +53,111 @@ const Payment = ({ cart }) => {
     if (!form.phone.trim()) { setErrorMsg("⚠️ Please fill your phone number."); return; }
     if (!form.street.trim()) { setErrorMsg("⚠️ Please fill your address."); return; }
 
-    const newOrderId = generateOrderId(); // e.g. ORD-EXWOFO
-
-    const itemsWithQuantity = cart.map((item) => ({
-      ...item,
-      quantity: item.quantity || 1,
-    }));
-
-    const order = {
-      customer_name:    form.name || "",
-      customer_email:   form.email || "",
-      customer_phone:   form.phone || "",
-      street_address:   form.street || "",
-      city:             form.city || "",
-      postal_code:      form.postal || "",
-      country:          form.country || "",
-      additional_notes: form.notes || "",
-      payment_method:   form.method,
-      items:            itemsWithQuantity,
-      total,
-      delivery_charges: deliveryCharges,
-      status:           "pending",
-      name:             form.name || "",
-      phone:            form.phone || "",
-      address:          `${form.street}, ${form.city}`,
-      // ── ORD-… goes into temp_tracking_id — NEVER into tracking_id ──
-      temp_tracking_id: newOrderId,
-      tracking_id:      null,   // courier fills this later via Scanner
-      logistics_status: "processing",
-    };
-
-    const { data: insertedOrder, error } = await supabase
-      .from("orders")
-      .insert([order])
-      .select()
-      .single();
-
-    if (error) {
-      console.error("❌ Error submitting order:", error);
-      setErrorMsg("❌ Failed to submit order. Please try again.");
+    if (passedItems.length === 0) {
+      setErrorMsg("⚠️ No items in order. Please go back and select items.");
       return;
     }
 
-    setOrderId(newOrderId);
+    try {
+      const newOrderId = generateOrderId();
 
-    // ── Update stock ──
-    for (const item of itemsWithQuantity) {
-      const { data: product, error: fetchErr } = await supabase
-        .from("products")
-        .select("id, totalQuantity, soldOut, colors")
-        .eq("id", item.parentId || item.id)
+      const itemsWithQuantity = passedItems.map((item) => ({
+        ...item,
+        quantity: item.quantity || 1,
+      }));
+
+      const order = {
+        customer_name:    form.name || "",
+        customer_email:   form.email || "",
+        customer_phone:   form.phone || "",
+        street_address:   form.street || "",
+        city:             form.city || "",
+        postal_code:      form.postal || "",
+        country:          form.country || "",
+        additional_notes: form.notes || "",
+        payment_method:   form.method,
+        items:            itemsWithQuantity,
+        total,
+        delivery_charges: deliveryCharges,
+        status:           "pending",
+        name:             form.name || "",
+        phone:            form.phone || "",
+        address:          `${form.street}, ${form.city}`,
+        temp_tracking_id: newOrderId,
+        tracking_id:      null,
+        logistics_status: "processing",
+      };
+
+      const { data: insertedOrder, error } = await supabase
+        .from("orders")
+        .insert([order])
+        .select()
         .single();
 
-      if (fetchErr) { console.error("Error fetching product:", fetchErr); continue; }
+      if (error) {
+        console.error("❌ Error submitting order:", error);
+        setErrorMsg("❌ Failed to submit order. Please try again.");
+        return;
+      }
 
-      let updated = { ...product };
+      setOrderId(newOrderId);
 
-      if (updated.colors && updated.colors.length > 0 && typeof item.variantIndex === "number") {
-        const idx = item.variantIndex;
-        const variant = updated.colors[idx];
-        if (variant) {
-          const currentQty = Number(variant.qty ?? variant.quantity ?? variant.stock ?? 0);
-          updated.colors[idx] = { ...variant, qty: Math.max(0, currentQty - item.quantity) };
+      // ── Update stock (non-fatal — never blocks order) ──
+      try {
+        for (const item of itemsWithQuantity) {
+          try {
+            const { data: product, error: fetchErr } = await supabase
+              .from("products")
+              .select("id, totalQuantity, soldOut, colors")
+              .eq("id", item.parentId || item.id)
+              .single();
+
+            if (fetchErr) { console.error("Error fetching product:", fetchErr); continue; }
+
+            let updated = { ...product };
+
+            if (updated.colors && updated.colors.length > 0 && typeof item.variantIndex === "number") {
+              const idx = item.variantIndex;
+              const variant = updated.colors[idx];
+
+              if (variant) {
+                const currentQty = Number(variant.qty ?? variant.quantity ?? variant.stock ?? 0);
+                updated.colors[idx] = { ...variant, qty: Math.max(0, currentQty - item.quantity) };
+              } else {
+                console.warn(`Variant at index ${idx} not found for product ${updated.id} — skipping stock update`);
+              }
+
+              if (updated.colors.every((c) => (c.qty ?? c.quantity ?? 0) <= 0)) updated.soldOut = true;
+            } else {
+              updated.totalQuantity = Math.max(0, (updated.totalQuantity ?? 0) - item.quantity);
+              if (updated.totalQuantity <= 0) updated.soldOut = true;
+            }
+
+            if (updated.colors && updated.colors.length > 0) {
+              updated.totalQuantity = updated.colors.reduce((sum, c) => sum + (c.qty ?? c.quantity ?? 0), 0);
+              if (updated.totalQuantity <= 0) updated.soldOut = true;
+            }
+
+            const { error: updateErr } = await supabase
+              .from("products")
+              .update({ totalQuantity: updated.totalQuantity, soldOut: updated.soldOut, colors: updated.colors })
+              .eq("id", updated.id);
+
+            if (updateErr) console.error("Error updating stock:", updateErr);
+
+          } catch (itemErr) {
+            console.error("Stock update failed for item:", item?.id, itemErr);
+            // continue to next item
+          }
         }
-        if (updated.colors.every((c) => (c.qty ?? c.quantity ?? 0) <= 0)) updated.soldOut = true;
-      } else {
-        updated.totalQuantity = Math.max(0, (updated.totalQuantity ?? 0) - item.quantity);
-        if (updated.totalQuantity <= 0) updated.soldOut = true;
+      } catch (stockErr) {
+        console.error("Stock update loop failed (non-fatal):", stockErr);
+        // order is already saved — don't block
       }
 
-      if (updated.colors && updated.colors.length > 0) {
-        updated.totalQuantity = updated.colors.reduce((sum, c) => sum + (c.qty ?? c.quantity ?? 0), 0);
-        if (updated.totalQuantity <= 0) updated.soldOut = true;
-      }
-
-      const { error: updateErr } = await supabase
-        .from("products")
-        .update({ totalQuantity: updated.totalQuantity, soldOut: updated.soldOut, colors: updated.colors })
-        .eq("id", updated.id);
-
-      if (updateErr) console.error("Error updating stock:", updateErr);
-    }
-
-    // ── WhatsApp notification ──
-    try {
-      const orderText = `
+      // ── WhatsApp notification ──
+      try {
+        const orderText = `
 🛒 *New Order Received!*
 
 👤 Name: ${form.name || "N/A"}
@@ -141,29 +169,34 @@ ${codTax > 0 ? `💵 Customer hands delivery boy: Rs ${total + codTax}` : ""}
 🔖 Order ID: ${newOrderId}
 
 Items:
-${itemsWithQuantity.map((i) => `- ${i.name} x ${i.quantity} = Rs ${i.price * i.quantity}`).join("\n")}
+${itemsWithQuantity.map((i) => `- ${i.name}${i.variantName ? ` (${i.variantName})` : ""} x ${i.quantity} = Rs ${i.price * i.quantity}`).join("\n")}
 
 Notes: ${form.notes || "None"}
-      `;
-      await fetch("http://localhost:3000/send-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderDetails: orderText }),
-      });
-      console.log("✅ WhatsApp order sent!");
-    } catch (err) {
-      console.error("❌ WhatsApp send failed:", err);
-    }
+        `;
+        await fetch("http://localhost:3000/send-order", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderDetails: orderText }),
+        });
+        console.log("✅ WhatsApp order sent!");
+      } catch (err) {
+        console.error("❌ WhatsApp send failed (non-fatal):", err);
+      }
 
-    // ── Pixel tracking ──
-    try {
-      if (window.trackPurchase) window.trackPurchase(total, "PKR");
-      if (window.trackOrderSubmitted) window.trackOrderSubmitted(insertedOrder?.id || Date.now().toString());
-    } catch (pixelErr) {
-      console.error("❌ Pixel tracking error:", pixelErr);
-    }
+      // ── Pixel tracking ──
+      try {
+        if (window.trackPurchase) window.trackPurchase(total, "PKR");
+        if (window.trackOrderSubmitted) window.trackOrderSubmitted(insertedOrder?.id || Date.now().toString());
+      } catch (pixelErr) {
+        console.error("❌ Pixel tracking error (non-fatal):", pixelErr);
+      }
 
-    setSubmitted(true);
+      setSubmitted(true);
+
+    } catch (unexpectedErr) {
+      console.error("❌ Unexpected error during order submission:", unexpectedErr);
+      setErrorMsg("❌ Something went wrong. Please try again or contact support.");
+    }
   };
 
   // ── Success screen ──
@@ -221,11 +254,23 @@ Notes: ${form.notes || "None"}
     );
   }
 
+  // ── Guard: if someone lands on /payment directly with no items ──
+  if (passedItems.length === 0) {
+    return (
+      <div className="payment-container" style={{ textAlign: "center", padding: "3rem 1rem" }}>
+        <h2>🛒 No items selected</h2>
+        <p style={{ color: "#555", marginTop: "1rem" }}>
+          Please go back to your cart and select the items you'd like to order.
+        </p>
+      </div>
+    );
+  }
+
   // ── Form ──
   return (
     <div className="payment-container">
       <h2 className="payment-title">💳 Payment Page</h2>
-      <p>Subtotal: Rs {subtotal}</p>
+      <p>Subtotal: Rs {subtotal.toLocaleString()}</p>
       <p>
         Delivery Charges: Rs {deliveryCharges}
         {isSmallOrder && (
@@ -241,13 +286,24 @@ Notes: ${form.notes || "None"}
         </div>
       )}
       <h3>
-        Total Amount: Rs {total}
+        Total Amount: Rs {total.toLocaleString()}
         {codTax > 0 && (
           <span style={{ fontSize: "0.78rem", fontWeight: "normal", color: "#555", display: "block", marginTop: "0.3rem", lineHeight: "1.4" }}>
             (Rs 75 will be collected by the delivery boy — so you will hand them <strong>Rs {total + codTax}</strong>, of which Rs 75 goes to them as the govt. COD fee &amp; Rs {total} is your order payment)
           </span>
         )}
       </h3>
+
+      {/* Order summary */}
+      <div style={{ background: "#f9f9f9", borderRadius: "8px", padding: "0.8rem 1rem", margin: "1rem 0", border: "1px solid #eee" }}>
+        <p style={{ fontWeight: "600", marginBottom: "0.5rem" }}>📋 Order Summary ({passedItems.length} item{passedItems.length !== 1 ? "s" : ""}):</p>
+        {passedItems.map((item, i) => (
+          <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "0.9rem", padding: "0.25rem 0", borderBottom: i < passedItems.length - 1 ? "1px solid #eee" : "none" }}>
+            <span>{item.name}{item.variantName ? ` (${item.variantName})` : ""} × {item.quantity || 1}</span>
+            <span>Rs {(Number(item.price || 0) * (item.quantity || 1)).toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
 
       <div style={{ margin: "1.5rem 0" }}>
         <label style={{ fontWeight: "bold" }}>Payment Method:</label>

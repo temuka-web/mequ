@@ -26,7 +26,11 @@ const DMOrdersPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedOrderIds, setSelectedOrderIds] = useState([]);
   const navigate = useNavigate();
+
+  // Only show select/invoice UI when navigated from invoice page
+  const isSelectMode = window.location.search.includes("selectMode=true");
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -73,6 +77,29 @@ const DMOrdersPage = () => {
     navigate("/admin/invoices");
   };
 
+  const toggleOrderSelection = (orderId) => {
+    setSelectedOrderIds((prev) => {
+      if (prev.includes(orderId)) {
+        return prev.filter((id) => id !== orderId);
+      }
+      if (prev.length >= 3) {
+        alert("You can select up to 3 orders at a time.");
+        return prev;
+      }
+      return [...prev, orderId];
+    });
+  };
+
+  const createInvoicesForSelected = () => {
+    if (selectedOrderIds.length === 0) {
+      alert("Please select at least 1 order.");
+      return;
+    }
+    const selectedOrders = dmOrders.filter((o) => selectedOrderIds.includes(o.order_id));
+    localStorage.setItem("selectedDMOrders", JSON.stringify(selectedOrders));
+    navigate("/admin/invoices");
+  };
+
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
     alert("Copied!");
@@ -96,6 +123,54 @@ const DMOrdersPage = () => {
           🔄 Refresh
         </button>
       </div>
+
+      {/* ── Multi-select bar: ONLY shown in selectMode ── */}
+      {isSelectMode && (
+        <div style={{
+          background: selectedOrderIds.length > 0 ? "#ede9fe" : "#f3f4f6",
+          border: `2px solid ${selectedOrderIds.length > 0 ? "#7c3aed" : "#e5e7eb"}`,
+          borderRadius: "10px",
+          padding: "12px 18px",
+          marginBottom: "18px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: "10px",
+        }}>
+          <div style={{ fontSize: "0.95rem", color: "#374151", fontWeight: 600 }}>
+            {selectedOrderIds.length === 0
+              ? "☑️ Tick orders to select (max 3), then create invoices"
+              : `✅ ${selectedOrderIds.length}/3 selected`}
+          </div>
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+            {selectedOrderIds.length > 0 && (
+              <button
+                onClick={() => setSelectedOrderIds([])}
+                style={{ padding: "7px 14px", background: "#e5e7eb", color: "#374151", border: "none", borderRadius: "6px", cursor: "pointer", fontWeight: 600 }}
+              >
+                ✕ Deselect All
+              </button>
+            )}
+            <button
+              onClick={createInvoicesForSelected}
+              disabled={selectedOrderIds.length === 0}
+              style={{
+                padding: "7px 18px",
+                background: selectedOrderIds.length > 0 ? "linear-gradient(135deg, #6b21a8, #db2777)" : "#d1d5db",
+                color: "#fff",
+                border: "none",
+                borderRadius: "6px",
+                cursor: selectedOrderIds.length > 0 ? "pointer" : "not-allowed",
+                fontWeight: 700,
+                fontSize: "0.95rem",
+              }}
+            >
+              📄 Create Invoices ({selectedOrderIds.length})
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Search Bar ── */}
       <div style={{ position: "relative", marginBottom: "18px" }}>
@@ -126,85 +201,153 @@ const DMOrdersPage = () => {
         </div>
       ) : (
         <div style={{ display: "grid", gap: "15px" }}>
-          {filteredOrders.map((order) => (
-            <div key={order.order_id} style={{ border: "1px solid #e9d5ff", padding: "20px", borderRadius: 12, background: "#fff", boxShadow: "0 2px 8px rgba(107,33,168,0.07)" }}>
+          {filteredOrders.map((order) => {
+            const isSelected = selectedOrderIds.includes(order.order_id);
 
-              {/* ── Top row: Order ID + Status ── */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "0.5rem" }}>
-                <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
-                    <span style={{ background: "#ede9fe", color: "#5b21b6", borderRadius: 6, padding: "3px 10px", fontFamily: "monospace", fontWeight: 800, fontSize: "0.88rem", letterSpacing: "0.04em" }}>
-                      🔖 {order.order_id}
-                    </span>
-                    <StatusBadge status={order.logistics_status || "processing"} />
+            return (
+              <div
+                key={order.order_id}
+                style={{
+                  border: `2px solid ${isSelectMode && isSelected ? "#7c3aed" : "#e9d5ff"}`,
+                  padding: "20px",
+                  borderRadius: 12,
+                  background: isSelectMode && isSelected ? "#faf5ff" : "#fff",
+                  boxShadow: isSelectMode && isSelected ? "0 0 0 3px #ede9fe" : "0 2px 8px rgba(107,33,168,0.07)",
+                  transition: "all 0.15s",
+                }}
+              >
+                {/* ── Top row: Checkbox (selectMode only) + Order ID + Status ── */}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "14px", flexWrap: "wrap", gap: "0.5rem" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+
+                    {/* Checkbox only in selectMode */}
+                    {isSelectMode && (
+                      <div
+                        onClick={() => toggleOrderSelection(order.order_id)}
+                        style={{
+                          width: "26px",
+                          height: "26px",
+                          borderRadius: "6px",
+                          border: `2px solid ${isSelected ? "#7c3aed" : "#9ca3af"}`,
+                          background: isSelected ? "#7c3aed" : "#fff",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          fontSize: "14px",
+                          color: "#fff",
+                          fontWeight: 700,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {isSelected ? "✓" : ""}
+                      </div>
+                    )}
+
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap" }}>
+                        <span style={{ background: "#ede9fe", color: "#5b21b6", borderRadius: 6, padding: "3px 10px", fontFamily: "monospace", fontWeight: 800, fontSize: "0.88rem", letterSpacing: "0.04em" }}>
+                          🔖 {order.order_id}
+                        </span>
+                        <StatusBadge status={order.logistics_status || "processing"} />
+                      </div>
+                      <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#999" }}>
+                        {order.created_at ? new Date(order.created_at).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "numeric", hour12: true }) : "—"}
+                      </p>
+                    </div>
                   </div>
-                  <p style={{ margin: "6px 0 0", fontSize: "12px", color: "#999" }}>
-                    {order.created_at ? new Date(order.created_at).toLocaleString("en-US", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "numeric", hour12: true }) : "—"}
-                  </p>
-                </div>
-                <button onClick={() => deleteOrder(order.order_id)}
-                  style={{ padding: "7px 14px", background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
-                  🗑️ Delete
-                </button>
-              </div>
 
-              {/* ── Tracking IDs block ── */}
-              {(order.tracking_id || order.temp_tracking_id) && (
-                <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "12px" }}>
-                  {order.tracking_id && (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "6px 12px" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e40af", fontFamily: "monospace" }}>
-                        🚚 Courier Tracking ID: {order.tracking_id}
-                      </span>
-                      <button onClick={() => copyToClipboard(order.tracking_id)}
-                        style={{ padding: "2px 7px", fontSize: "11px", background: "#dbeafe", color: "#1e40af", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
-                    </div>
-                  )}
-                  {order.temp_tracking_id && (
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 8, padding: "6px 12px" }}>
-                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#92400e", fontFamily: "monospace" }}>
-                        🔖 Temp ID: {order.temp_tracking_id}
-                      </span>
-                      <button onClick={() => copyToClipboard(order.temp_tracking_id)}
-                        style={{ padding: "2px 7px", fontSize: "11px", background: "#fde68a", color: "#92400e", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── Details ── */}
-              <div style={{ display: "grid", gap: "10px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <strong>👤 Name:</strong> {order.name}
-                  <button onClick={() => copyToClipboard(order.name)} style={{ padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                  <button onClick={() => deleteOrder(order.order_id)}
+                    style={{ padding: "7px 14px", background: "#fee2e2", color: "#991b1b", border: "none", borderRadius: 6, cursor: "pointer", fontSize: "13px", fontWeight: 600 }}>
+                    🗑️ Delete
+                  </button>
                 </div>
 
-                <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                  <strong>📞 Phone:</strong>
-                  <a href={`tel:${order.phone}`} style={{ color: "#6b21a8", textDecoration: "none" }}>{order.phone}</a>
-                  <button onClick={() => copyToClipboard(order.phone)} style={{ padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
-                </div>
-
-                {order.city && (
-                  <div><strong>🏙️ City:</strong> {order.city}</div>
+                {/* ── Tracking IDs block ── */}
+                {(order.tracking_id || order.temp_tracking_id) && (
+                  <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginBottom: "12px" }}>
+                    {order.tracking_id && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 8, padding: "6px 12px" }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#1e40af", fontFamily: "monospace" }}>
+                          🚚 Courier Tracking ID: {order.tracking_id}
+                        </span>
+                        <button onClick={() => copyToClipboard(order.tracking_id)}
+                          style={{ padding: "2px 7px", fontSize: "11px", background: "#dbeafe", color: "#1e40af", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                      </div>
+                    )}
+                    {order.temp_tracking_id && (
+                      <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: 8, padding: "6px 12px" }}>
+                        <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "#92400e", fontFamily: "monospace" }}>
+                          🔖 Temp ID: {order.temp_tracking_id}
+                        </span>
+                        <button onClick={() => copyToClipboard(order.temp_tracking_id)}
+                          style={{ padding: "2px 7px", fontSize: "11px", background: "#fde68a", color: "#92400e", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                      </div>
+                    )}
+                  </div>
                 )}
 
-                <div style={{ background: "#faf5ff", padding: "10px", borderRadius: 8, position: "relative" }}>
-                  <strong>📍 Address:</strong>
-                  <p style={{ margin: "5px 0 0", whiteSpace: "pre-wrap", fontSize: "0.9rem" }}>{order.address}</p>
-                  <button onClick={() => copyToClipboard(order.address)} style={{ position: "absolute", top: 10, right: 10, padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                {/* ── Details ── */}
+                <div style={{ display: "grid", gap: "10px" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <strong>👤 Name:</strong> {order.name}
+                    <button onClick={() => copyToClipboard(order.name)} style={{ padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <strong>📞 Phone:</strong>
+                    <a href={`tel:${order.phone}`} style={{ color: "#6b21a8", textDecoration: "none" }}>{order.phone}</a>
+                    <button onClick={() => copyToClipboard(order.phone)} style={{ padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                  </div>
+
+                  {order.city && (
+                    <div><strong>🏙️ City:</strong> {order.city}</div>
+                  )}
+
+                  <div style={{ background: "#faf5ff", padding: "10px", borderRadius: 8, position: "relative" }}>
+                    <strong>📍 Address:</strong>
+                    <p style={{ margin: "5px 0 0", whiteSpace: "pre-wrap", fontSize: "0.9rem" }}>{order.address}</p>
+                    <button onClick={() => copyToClipboard(order.address)} style={{ position: "absolute", top: 10, right: 10, padding: "3px 8px", fontSize: "11px", background: "#ede9fe", color: "#6b21a8", border: "none", borderRadius: 4, cursor: "pointer" }}>📋</button>
+                  </div>
+                </div>
+
+                {/* ── Invoice button(s) ── */}
+                <div style={{ marginTop: "14px", borderTop: "1px solid #e9d5ff", paddingTop: "14px", display: "flex", gap: "10px" }}>
+                  {isSelectMode ? (
+                    <>
+                      <button
+                        onClick={() => toggleOrderSelection(order.order_id)}
+                        style={{
+                          flex: 1,
+                          padding: "10px",
+                          background: isSelected ? "#7c3aed" : "#ede9fe",
+                          color: isSelected ? "#fff" : "#6b21a8",
+                          border: "none",
+                          borderRadius: 8,
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 700,
+                          transition: "all 0.15s",
+                        }}
+                      >
+                        {isSelected ? "✅ Selected" : "☐ Select for Invoice"}
+                      </button>
+                      <button onClick={() => createInvoice(order)}
+                        style={{ flex: 1, padding: "10px", background: "linear-gradient(135deg, #6b21a8, #db2777)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "14px", fontWeight: 700 }}>
+                        📄 Single Invoice
+                      </button>
+                    </>
+                  ) : (
+                    <button onClick={() => createInvoice(order)}
+                      style={{ flex: 1, padding: "10px", background: "linear-gradient(135deg, #6b21a8, #db2777)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "14px", fontWeight: 700 }}>
+                      📄 Create Invoice
+                    </button>
+                  )}
                 </div>
               </div>
-
-              {/* ── Invoice button ── */}
-              <div style={{ marginTop: "14px", borderTop: "1px solid #e9d5ff", paddingTop: "14px" }}>
-                <button onClick={() => createInvoice(order)}
-                  style={{ width: "100%", padding: "11px", background: "linear-gradient(135deg, #6b21a8, #db2777)", color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontSize: "15px", fontWeight: 700 }}>
-                  📄 Create Invoice
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

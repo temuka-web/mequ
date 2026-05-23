@@ -129,9 +129,25 @@ const Checkout = ({ cart, updateCart, clearCart }) => {
     return sum + price * qty;
   }, 0);
 
+  // ✅ Only the selected items with their capped quantities
+  const selectedCartItems = selectedItems.map((i) => {
+    const item = cart[i];
+    const stock = getItemStock(item);
+    const cappedQty = Math.min(item.quantity || 1, Math.max(0, stock));
+    return { ...item, quantity: cappedQty };
+  });
+
   const giftThreshold = 3000;
   const giftProgress = Math.min((subtotal / giftThreshold) * 100, 100);
   const qualifiedForGift = subtotal >= giftThreshold;
+
+  const canProceed =
+    selectedItems.length > 0 &&
+    subtotal > 0 &&
+    selectedCartItems.every((item) => {
+      const stock = getItemStock(item);
+      return stock > 0;
+    });
 
   return (
     <div
@@ -337,7 +353,8 @@ const Checkout = ({ cart, updateCart, clearCart }) => {
           {/* 💰 Summary */}
           <div className="checkout-summary" style={{ marginTop: "1.5rem", paddingTop: "1rem" }}>
             <p style={{ fontSize: "1.1rem", margin: "0.4rem 0" }}>
-              Subtotal: <strong>Rs {subtotal.toLocaleString()}</strong>
+              Subtotal ({selectedItems.length} item{selectedItems.length !== 1 ? "s" : ""} selected):{" "}
+              <strong>Rs {subtotal.toLocaleString()}</strong>
             </p>
             <h3 style={{ fontSize: "1.4rem", marginTop: "0.8rem", color: "#111" }}>
               Total: Rs {subtotal.toLocaleString()}
@@ -347,29 +364,29 @@ const Checkout = ({ cart, updateCart, clearCart }) => {
           {/* ✅ Proceed to Pay Button */}
           <button
             className="pay-button"
-            disabled={selectedItems.length === 0 || subtotal === 0}
+            disabled={!canProceed}
             onClick={() =>
               navigate("/payment", {
-                state: { total: subtotal, items: selectedItems.map((i) => cart[i]) },
+                state: {
+                  total: subtotal,
+                  items: selectedCartItems,  // ✅ only selected items, quantities capped
+                },
               })
             }
             style={{
               marginTop: "1.5rem",
               padding: "0.9rem 1.5rem",
-              background: selectedItems.length === 0 || subtotal === 0 ? "#aaa" : "#333",
+              background: !canProceed ? "#aaa" : "#333",
               color: "#fff",
               border: "none",
               borderRadius: "8px",
               fontSize: "1.05rem",
               fontWeight: "600",
-              cursor:
-                selectedItems.length === 0 || subtotal === 0
-                  ? "not-allowed"
-                  : "pointer",
+              cursor: !canProceed ? "not-allowed" : "pointer",
               transition: "background-color 0.3s ease",
             }}
           >
-            💰 Proceed to submit order 
+            💰 Proceed to submit order
           </button>
         </div>
       )}

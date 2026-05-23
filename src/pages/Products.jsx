@@ -1,5 +1,5 @@
 // src/pages/Products.jsx
-import React, { useEffect, useState, useRef, useCallback, memo } from "react";
+import React, { useEffect, useState, useRef, useCallback, memo, useMemo } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { createClient } from "@supabase/supabase-js";
 
@@ -9,6 +9,29 @@ const supabase = createClient(
 );
 
 const WHATSAPP_NUMBER = "923193128443";
+
+// ── Auto-category detection (same keyword map as Landing) ─────────────────────
+const CATEGORY_KEYWORDS = {
+  "Stickers":    ["sticker", "stickers", "decal", "decals", "vinyl"],
+  "Bookmarks":   ["bookmark", "bookmarks", "book mark"],
+  "Keychains":   ["keychain", "keychains", "key chain", "keyring"],
+  "Posters":     ["poster", "posters", "print", "art print"],
+  "Notebooks":   ["notebook", "notebooks", "journal", "planner", "diary"],
+  "Bags":        ["bag", "bags", "tote", "pouch", "wallet"],
+  "Accessories": ["accessory", "accessories", "bracelet", "necklace", "ring", "earring"],
+  "Clothing":    ["shirt", "tshirt", "t-shirt", "hoodie", "sweatshirt", "jacket", "cap", "hat"],
+  "Beauty":      ["lip", "gloss", "blush", "mascara", "eyeliner", "skincare", "serum", "moisturizer"],
+  "Toys":        ["toy", "toys", "plush", "stuffed", "doll", "figurine"],
+  "Tech":        ["cable", "charger", "phone", "case", "earbuds", "wireless"],
+  "Home":        ["mug", "cup", "candle", "cushion", "pillow", "lamp", "clock"],
+};
+function detectCategory(name = "") {
+  const lower = name.toLowerCase();
+  for (const [cat, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some((kw) => lower.includes(kw))) return cat;
+  }
+  return "Other";
+}
 
 const STYLES = `
   @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -39,6 +62,7 @@ const STYLES = `
   .prd-card:hover .prd-card-imgwrap img { transform: scale(1.08); }
   .prd-addbtn { transition: background 0.18s, transform 0.12s; }
   .prd-addbtn:hover:not(:disabled) { background: #c6338c !important; transform: scale(1.03); }
+  .prd-addbtn:disabled { cursor: not-allowed !important; }
   .prd-nav a {
     text-decoration: none; color: #111; font-weight: 500;
     font-size: clamp(0.82rem, 2.2vw, 0.96rem);
@@ -86,6 +110,15 @@ const STYLES = `
     text-transform: uppercase; padding: 0.22rem 0.55rem;
     border-radius: 4px; color: #fff; pointer-events: none;
   }
+  /* Category chips */
+  .prd-cat-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+  .prd-cat-chip {
+    padding: 0.28rem 0.85rem; border-radius: 100px; font-size: 0.78rem; font-weight: 600;
+    border: 1.5px solid #ddd; background: #fff; color: #555; cursor: pointer;
+    transition: all 0.15s; white-space: nowrap;
+  }
+  .prd-cat-chip:hover { border-color: #c6338c; color: #c6338c; }
+  .prd-cat-chip.active { background: #111; color: #fff; border-color: #111; }
 `;
 
 const FloatingCart = React.forwardRef(({ count, onClick }, ref) => (
@@ -151,6 +184,7 @@ const TopBar = memo(() => {
           <Link to="/checkout">Checkout</Link>
           <Link to="/policies">Policies</Link>
           <Link to="/contact">Contact</Link>
+          <Link to="/track" style={{ color: "#c6338c", fontWeight: 700 }}>Track Order</Link>
         </div>
       </nav>
     </>
@@ -158,7 +192,7 @@ const TopBar = memo(() => {
 });
 TopBar.displayName = "TopBar";
 
-/* ── Memoized product card to prevent unnecessary re-renders ── */
+/* ── Memoized product card ── */
 const ProductCard = memo(({ p, idx, onView, onAdd, isBusy, variantIdx }) => {
   const resolveImg = (img) => {
     if (!img) return "";
@@ -176,6 +210,8 @@ const ProductCard = memo(({ p, idx, onView, onAdd, isBusy, variantIdx }) => {
   const qty = Number(p.totalQuantity ?? p.totalquantity ?? 0);
   const isLow = qty > 0 && qty <= 7;
   const isOut = qty <= 0;
+  // ✅ available = not soldOut AND has stock
+  const available = !p.soldOut && !isOut;
 
   return (
     <div
@@ -183,14 +219,19 @@ const ProductCard = memo(({ p, idx, onView, onAdd, isBusy, variantIdx }) => {
       style={{ textAlign: "center", border: "1px solid #e0ddd4", borderRadius: 12, padding: "0", position: "relative", display: "flex", flexDirection: "column", backgroundColor: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.05)", animationDelay: `${idx * 0.03}s` }}
       onClick={() => onView(p, rawImg)}
     >
-      {p.soldOut && <span className="prd-badge" style={{ background: "#111" }}>Sold Out</span>}
-      {!p.soldOut && isLow && <span className="prd-badge" style={{ background: "#b45309" }}>Only {qty} left</span>}
+      {(!available) && <span className="prd-badge" style={{ background: "#111" }}>Sold Out</span>}
+      {available && isLow && <span className="prd-badge" style={{ background: "#b45309" }}>Only {qty} left</span>}
       <div className="prd-card-imgwrap" style={{ borderRadius: "12px 12px 0 0" }}>
         {finalImage ? (
           <img
             src={finalImage} alt={p.name} onError={imgErr}
+            // ✅ Fast loading
             loading={idx < 4 ? "eager" : "lazy"}
-            style={{ width: "100%", height: "auto", aspectRatio: "4/3", objectFit: "cover", display: "block", borderRadius: "12px 12px 0 0" }}
+            decoding="async"
+            fetchpriority={idx === 0 ? "high" : "auto"}
+            width="400"
+            height="300"
+            style={{ width: "100%", height: "auto", aspectRatio: "4/3", objectFit: "cover", display: "block", borderRadius: "12px 12px 0 0", opacity: available ? 1 : 0.5 }}
           />
         ) : (
           <div style={{ width: "100%", aspectRatio: "4/3", background: "#f0ede4", display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: "0.75rem", borderRadius: "12px 12px 0 0" }}>No Image</div>
@@ -205,10 +246,11 @@ const ProductCard = memo(({ p, idx, onView, onAdd, isBusy, variantIdx }) => {
           <button
             className="prd-addbtn"
             onClick={(e) => { e.stopPropagation(); onAdd(p, variantIdx ?? null, e); }}
-            disabled={p.soldOut || isBusy || qty <= 0}
-            style={{ flex: 1, padding: "0.4rem 0.4rem", fontSize: "0.78rem", fontWeight: 600, backgroundColor: p.soldOut || isOut ? "#ddd" : "#111", color: p.soldOut || isOut ? "#aaa" : "#fff", border: "none", borderRadius: 7, cursor: p.soldOut || isOut ? "not-allowed" : "pointer" }}
+            // ✅ disabled if not available
+            disabled={!available || isBusy}
+            style={{ flex: 1, padding: "0.4rem 0.4rem", fontSize: "0.78rem", fontWeight: 600, backgroundColor: available ? "#111" : "#ddd", color: available ? "#fff" : "#aaa", border: "none", borderRadius: 7, cursor: available ? "pointer" : "not-allowed" }}
           >
-            {p.soldOut || isOut ? "Unavail." : "Add"}
+            {available ? "Add" : "Unavail."}
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onView(p, rawImg); }}
@@ -230,12 +272,17 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
   const [mainImage, setMainImage]   = useState("");
   const [zoomed, setZoomed]         = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeCategory, setActiveCategory] = useState("All");
   const [loading, setLoading]       = useState(true);
   const [busyIds, setBusyIds]       = useState([]);
   const [variantSelection, setVariantSelection] = useState({});
   const [flyingDots, setFlyingDots] = useState([]);
+
+  // ✅ Scroll position memory — save before opening detail, restore on back
+  const savedScrollY = useRef(0);
+
   const cartIconRef  = useRef(null);
-  const didAutoOpen  = useRef(false); // ✅ FIX: track if we already auto-opened
+  const didAutoOpen  = useRef(false);
   const navigate     = useNavigate();
   const location     = useLocation();
 
@@ -277,7 +324,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
     setTimeout(() => setFlyingDots((prev) => prev.filter((d) => d.id !== id)), 850);
   };
 
-  /* ── Fetch — only realtime, no polling interval ── */
+  /* ── Fetch ── */
   const fetchProducts = useCallback(async () => {
     try {
       const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
@@ -296,7 +343,6 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
 
   useEffect(() => {
     fetchProducts();
-    // ✅ FIX: removed setInterval — realtime handles updates, no need to hammer the DB every 8s
     const ch = supabase.channel("mequ-products")
       .on("postgres_changes", { event: "*", schema: "public", table: "products" }, fetchProducts)
       .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, fetchProducts)
@@ -304,22 +350,21 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
     return () => { try { supabase.removeChannel(ch); } catch (_) {} };
   }, [fetchProducts]);
 
-  /* ── ✅ FIX: Auto-open product — only fires ONCE, then clears state ── */
+  /* ── Auto-open from Landing ── */
   useEffect(() => {
     if (didAutoOpen.current) return;
     if (!location.state?.openProductId || products.length === 0) return;
     const target = products.find((p) => p.id === location.state.openProductId);
     if (target) {
       didAutoOpen.current = true;
+      savedScrollY.current = 0; // came from Landing, start at top of detail
       setSelected(target);
       setMainImage(resolveImg(target.image?.trim() || ""));
       setZoomed(false);
-      // ✅ FIX: clear router state immediately so Back never re-opens this
       window.history.replaceState({}, "", window.location.pathname);
     }
   }, [location.state?.openProductId, products, resolveImg]);
 
-  /* ── ✅ FIX: reset didAutoOpen when navigating away & back ── */
   useEffect(() => {
     return () => { didAutoOpen.current = false; };
   }, []);
@@ -342,9 +387,13 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
 
   const handleAddToCart = useCallback((p, vi = null, e = null) => {
     if (!p) return;
+    // ✅ Guard: never add unavailable items
+    const qty = getQty(p);
+    if (p.soldOut || qty <= 0) return;
+
     const idx = typeof vi === "number" && vi >= 0 ? vi : null;
     const vq = idx !== null ? variantQty(p, idx) : null;
-    const available = vq !== null ? vq : getQty(p);
+    const available = vq !== null ? vq : qty;
     if (available <= 0) return;
 
     setBusyIds((c) => Array.from(new Set([...c, p.id])));
@@ -377,23 +426,45 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
     setTimeout(() => setBusyIds((c) => c.filter((x) => x !== p.id)), 400);
   }, [addToCart, resolveImg]);
 
-  /* ── ✅ FIX: handleBack clears selected cleanly ── */
+  // ✅ Back from detail — restore exact scroll position
   const handleBack = useCallback(() => {
+    const scrollTo = savedScrollY.current;
     setSelected(null);
     setMainImage("");
     setZoomed(false);
-    // ensure router state is clean so no re-open on future renders
     window.history.replaceState({}, "", window.location.pathname);
+    // Restore scroll after React re-renders the grid
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollTo, behavior: "instant" });
+      });
+    });
   }, []);
 
+  // ✅ Open detail — save current scroll first
   const handleViewProduct = useCallback((p, rawImg) => {
+    savedScrollY.current = window.scrollY;
     setVariantSelection((cur) => { const copy = { ...cur }; delete copy[p.id]; return copy; });
     setSelected(p);
     setMainImage(resolveImg(rawImg));
     setZoomed(false);
+    window.scrollTo({ top: 0, behavior: "instant" });
   }, [resolveImg]);
 
-  const filtered = products.filter((p) => (p.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
+  // ── Auto-detected categories ──
+  const categories = useMemo(() => {
+    const cats = new Set();
+    products.forEach((p) => cats.add(detectCategory(p.name)));
+    const sorted = Array.from(cats).filter((c) => c !== "Other").sort();
+    if (cats.has("Other")) sorted.push("Other");
+    return ["All", ...sorted];
+  }, [products]);
+
+  const filtered = useMemo(() => products.filter((p) => {
+    const matchSearch = (p.name || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchCat = activeCategory === "All" || detectCategory(p.name) === activeCategory;
+    return matchSearch && matchCat;
+  }), [products, searchTerm, activeCategory]);
 
   const WaBtnSvg = (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="white">
@@ -430,6 +501,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
     const displayedName  = hasVI && selVName ? `${selected.name} — ${selVName}` : selected.name || "";
     const displayedImage = selVImg || displayMain;
     const effectiveQty   = selVQty !== null ? selVQty : overallQty;
+    const isDetailAvailable = !selected.soldOut && effectiveQty > 0;
 
     return (
       <div style={{ backgroundColor: "#fffdf4", minHeight: "100vh" }}>
@@ -439,12 +511,12 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
         <TopBar />
 
         <div style={{ padding: "1rem 1.2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-          {/* ✅ FIX: uses handleBack instead of inline setState */}
+          {/* ✅ Back button restores scroll position */}
           <button
             onClick={handleBack}
             style={{ margin: "0.7rem 0", padding: "0.4rem 0.85rem", borderRadius: 7, border: "1.5px solid #ddd", background: "#fff", cursor: "pointer", fontSize: "0.88rem", color: "#444", fontWeight: 500 }}
           >
-            ← Back
+            ← Back to Catalogue
           </button>
 
           <div style={{ display: "flex", flexWrap: "wrap", gap: "2rem", alignItems: "flex-start" }}>
@@ -455,6 +527,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
               >
                 {displayedImage ? (
                   <img src={displayedImage} alt={displayedName} onError={imgErr} decoding="async" loading="eager"
+                    fetchpriority="high"
                     style={{ width: zoomed ? "150%" : "100%", height: zoomed ? "auto" : "min(62vh, 600px)", objectFit: zoomed ? "contain" : "cover" }}
                   />
                 ) : (
@@ -503,11 +576,12 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
                       const vq = variantQty(selected, idx);
                       const vp = variantPrice(selected, idx);
                       const active = variantSelection[selected.id] === idx;
+                      const vAvail = vq === null || vq > 0;
                       return (
                         <div key={idx} style={{ display: "flex", flexDirection: "column", gap: "0.3rem", alignItems: "center", minWidth: 108 }}>
                           <button
                             onClick={(e) => { e.stopPropagation(); setVariantSelection((cur) => ({ ...cur, [selected.id]: idx })); if (vImg) { setMainImage(vImg); setZoomed(false); } }}
-                            style={{ display: "flex", gap: "0.45rem", alignItems: "center", padding: "0.42rem 0.55rem", borderRadius: 9, border: active ? "2px solid #111" : "1.5px solid #ddd", background: active ? "#f7f5f0" : "#fff", cursor: "pointer", minWidth: 108, transition: "border-color 0.15s, background 0.15s" }}
+                            style={{ display: "flex", gap: "0.45rem", alignItems: "center", padding: "0.42rem 0.55rem", borderRadius: 9, border: active ? "2px solid #111" : "1.5px solid #ddd", background: active ? "#f7f5f0" : "#fff", cursor: "pointer", minWidth: 108, transition: "border-color 0.15s, background 0.15s", opacity: vAvail ? 1 : 0.5 }}
                           >
                             {vImg && <img src={vImg} alt={name} width="36" height="36" style={{ objectFit: "cover", borderRadius: 6 }} onError={imgErr} />}
                             <div style={{ textAlign: "left" }}>
@@ -518,6 +592,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
                               {vp !== null && <div style={{ fontSize: "0.76rem", fontWeight: 700, marginTop: "0.1rem" }}>PKR {Number(vp).toLocaleString()}</div>}
                             </div>
                           </button>
+                          {/* ✅ Per-variant add button disabled if that variant is out */}
                           <button
                             className="prd-var-addbtn"
                             disabled={selected.soldOut || busyIds.includes(selected.id) || (vq !== null && vq <= 0)}
@@ -542,13 +617,14 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
                 <div style={{ color: "#dc2626", fontWeight: 600, fontSize: "0.85rem", marginBottom: "0.5rem" }}>❌ Out of stock</div>
               )}
 
+              {/* ✅ Main add-to-cart button disabled if unavailable */}
               <button
                 className="prd-addbtn"
-                disabled={selected.soldOut || busyIds.includes(selected.id) || (selVQty !== null && selVQty <= 0)}
+                disabled={!isDetailAvailable || busyIds.includes(selected.id)}
                 onClick={(e) => handleAddToCart(selected, variantSelection[selected.id] ?? null, e)}
-                style={{ padding: "0.7rem 1.8rem", fontSize: "1rem", backgroundColor: selected.soldOut ? "#ccc" : "#111", color: "#fff", border: "none", borderRadius: 10, cursor: selected.soldOut ? "not-allowed" : "pointer", fontWeight: 700, letterSpacing: "0.02em", marginTop: "0.5rem" }}
+                style={{ padding: "0.7rem 1.8rem", fontSize: "1rem", backgroundColor: isDetailAvailable ? "#111" : "#ccc", color: "#fff", border: "none", borderRadius: 10, cursor: isDetailAvailable ? "pointer" : "not-allowed", fontWeight: 700, letterSpacing: "0.02em", marginTop: "0.5rem" }}
               >
-                {selected.soldOut ? "Unavailable" : "Add to Cart"}
+                {isDetailAvailable ? "Add to Cart" : "Unavailable"}
               </button>
 
               <div style={{ display: "flex", flexWrap: "wrap", gap: "0.45rem", marginTop: "1.2rem" }}>
@@ -572,7 +648,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
       <TopBar />
 
       <div style={{ padding: "0.8rem 1.2rem 5rem", maxWidth: 1100, margin: "0 auto" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "1rem", margin: "0.8rem 0 1rem", flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "1rem", margin: "0.8rem 0 0.6rem", flexWrap: "wrap" }}>
           <h2 style={{ fontSize: "clamp(1.1rem, 3vw, 1.35rem)", fontWeight: 700, margin: 0, color: "#111", letterSpacing: "-0.01em", flex: "none" }}>
             🛍️ All Products <span style={{ color: "#bbb", fontSize: "0.8rem", fontWeight: 400 }}>({filtered.length})</span>
           </h2>
@@ -580,7 +656,7 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
             <span style={{ position: "absolute", left: "0.8rem", top: "50%", transform: "translateY(-50%)", color: "#aaa", pointerEvents: "none" }}>🔍</span>
             <input
               type="text" placeholder="Search products..."
-              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setActiveCategory("All"); }}
               style={{ padding: "0.48rem 1rem 0.48rem 2.3rem", width: "100%", fontSize: "0.9rem", borderRadius: 9, border: "1.5px solid #ddd", outline: "none", background: "#fff", transition: "border-color 0.18s" }}
               onFocus={(e) => e.target.style.borderColor = "#c6338c"}
               onBlur={(e) => e.target.style.borderColor = "#ddd"}
@@ -588,8 +664,25 @@ const Products = ({ addToCart = () => {}, cartItems = [] }) => {
           </div>
         </div>
 
+        {/* ── Category chips ── */}
+        {categories.length > 1 && (
+          <div className="prd-cat-chips">
+            {categories.map((cat) => (
+              <button
+                key={cat}
+                className={`prd-cat-chip${activeCategory === cat ? " active" : ""}`}
+                onClick={() => { setActiveCategory(cat); setSearchTerm(""); }}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+        )}
+
         {filtered.length === 0 ? (
-          <p style={{ textAlign: "center", color: "#888", padding: "3rem", fontStyle: "italic" }}>No products found for "{searchTerm}"</p>
+          <p style={{ textAlign: "center", color: "#888", padding: "3rem", fontStyle: "italic" }}>
+            No products found{searchTerm ? ` for "${searchTerm}"` : ` in ${activeCategory}`}
+          </p>
         ) : (
           <div className="prd-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "12px", marginBottom: 16 }}>
             {filtered.map((p, idx) => (

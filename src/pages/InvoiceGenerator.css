@@ -8,6 +8,18 @@
   background: #f0f0f0;
 }
 
+.screen-only {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.print-only {
+  display: none;
+}
+
 .invoice-block {
   width: 100%;
   max-width: 800px;
@@ -166,9 +178,7 @@
   font-size: 13px;
 }
 
-.delete-btn:hover {
-  background: #c82333;
-}
+.delete-btn:hover { background: #c82333; }
 
 .actions {
   display: flex;
@@ -188,17 +198,15 @@
   transition: background 0.2s;
 }
 
-.actions button:hover {
-  background: #333;
-}
+.actions button:hover { background: #333; }
 
 
-/* ==================== PRINT MODE - 3 INVOICES PER A4 PAGE ==================== */
+/* ==================== PRINT MODE ==================== */
 @media print {
 
   @page {
-    size: A4;
-    margin: 4mm;
+    size: A4 portrait;
+    margin: 0;
   }
 
   body {
@@ -208,21 +216,47 @@
     print-color-adjust: exact;
   }
 
+  .no-print { display: none !important; }
+  .screen-only { display: none !important; }
+  .print-only { display: block !important; }
+
   .invoice-page {
     display: block !important;
-    width: 100%;
     padding: 0 !important;
     margin: 0 !important;
     background: white !important;
   }
 
-  /* KEY FIX: no fixed height, use min-height so content never overflows into itself */
-  .invoice-block {
+  /*
+   * Each .print-page = exactly one A4 sheet.
+   * 100vh in print context = full page height.
+   * No margins on @page means 100vh = full A4 = 297mm.
+   * We use padding inside to give breathing room instead of margin.
+   */
+  .print-page {
+    width: 100vw;
+    height: 100vh;
+    padding: 4mm;
+    display: flex;
+    flex-direction: column;
+    page-break-after: always;
+    break-after: page;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .print-page:last-child {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
+
+  /* 3 equal rows inside the page, with tiny gap between */
+  .print-page .invoice-block {
+    flex: 1 1 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    min-height: 31vh !important;
-    max-height: 32.5vh !important;
-    margin: 0 0 2px 0 !important;
+    min-height: 0 !important;
+    margin: 0 0 2mm 0 !important;
     padding: 4px 6px !important;
     border: 1.5px solid #000 !important;
     box-shadow: none !important;
@@ -232,11 +266,20 @@
     flex-direction: column !important;
     box-sizing: border-box !important;
     overflow: hidden !important;
+    outline: none !important;
   }
 
-  .invoice-block:nth-child(3n) {
-    page-break-after: always !important;
-    break-after: page !important;
+  .print-page .invoice-block:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* ── selected print mode ── */
+  body.printing-selected .print-page .invoice-block {
+    display: none !important;
+  }
+  body.printing-selected .print-page .invoice-block.selected-for-print {
+    display: flex !important;
+    flex: 1 1 0 !important;
   }
 
   .prepaid-header {
@@ -256,11 +299,9 @@
     margin-bottom: 2px !important;
     border-bottom: 1.5px solid #000 !important;
     flex-shrink: 0 !important;
-    overflow: visible !important;
     align-items: flex-start !important;
   }
 
-  /* KEY FIX: overflow visible, no clipping */
   .receiver-info, .sender-info {
     width: 48% !important;
     line-height: 1.35 !important;
@@ -281,7 +322,6 @@
     margin: 0 0 2px 0 !important;
   }
 
-  /* KEY FIX: no margin so fields don't push each other */
   .field-group {
     margin-bottom: 0 !important;
     padding-bottom: 0 !important;
@@ -297,7 +337,6 @@
     line-height: 1.2 !important;
   }
 
-  /* KEY FIX: inputs have no padding/margin, tight line-height */
   .receiver-info input,
   .receiver-info textarea {
     border: none !important;
@@ -321,6 +360,12 @@
   .receiver-info textarea {
     min-height: auto !important;
     max-height: none !important;
+  }
+
+  .city-field input {
+    font-size: 14px !important;
+    font-weight: 900 !important;
+    letter-spacing: 0.3px !important;
   }
 
   .sender-info {
@@ -379,7 +424,6 @@
     font-weight: 900 !important;
     font-size: 13px !important;
     color: #000 !important;
-    margin-right: 0 !important;
   }
 
   .amount-group input {
@@ -392,24 +436,24 @@
     padding: 0 !important;
   }
 
-  /* ALWAYS VISIBLE — pinned to bottom, never overwritten */
   .urdu-warning {
     font-weight: 900 !important;
-    font-size: 13px !important;
+    font-size: 16px !important;
     color: #000 !important;
     text-align: center !important;
     margin-top: auto !important;
-    padding: 3px !important;
+    padding: 4px 3px !important;
     background: #fff3cd !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    border: 1px solid #e0c060 !important;
+    border: 1.5px solid #c8a000 !important;
     border-radius: 0 !important;
     flex-shrink: 0 !important;
-    line-height: 1.4 !important;
+    line-height: 1.6 !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    letter-spacing: 0.3px !important;
   }
 
   .actions,
@@ -417,5 +461,4 @@
   .print-btn {
     display: none !important;
   }
-
 }
